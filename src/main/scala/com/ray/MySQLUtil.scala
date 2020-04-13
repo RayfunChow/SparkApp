@@ -42,6 +42,7 @@ object MySQLUtil {
 
   def readTable(tableName: String): DataFrame = {
     val df = App.spark.read.jdbc(url, tableName, prop)
+    println("成功读取" + tableName + "表")
     df
   }
 

@@ -9,7 +9,9 @@
     *   df.filter(df("id").isNull).select("id").show()
     *   data1.filter("gender is not null").select("gender").limit(10).show  
     *   data1.filter("gender<>''").select("gender").limit(10).show
-    *   df.where("BigFiveE == ' '").count()    
+    *   df.where("BigFiveE == ' '").count() 
+*   写数据库时指定字段类型：  
+    df.write.option("createTableColumnTypes", "columnName VARCHAR(200)")      
 *   Spark SQL中列类型为String的在MySQL中对应为Text类型     
 *   Spark 2.1 不支持 createTableColumnTypes
 *   创建临时视图：df.createOrReplaceTempView("temp_view")
@@ -29,3 +31,4 @@
     *   ps.addBatch()
     *   ps.executeBatch()
 *   删除表视图还存在，但是不能用了     
+*   删除重复值：dropDuplicates(colName)
