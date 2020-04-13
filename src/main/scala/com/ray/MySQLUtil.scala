@@ -1,14 +1,12 @@
 package com.ray
 
-import java.sql.DriverManager
-
 import org.apache.spark.sql.{DataFrame, SaveMode}
 
 object MySQLUtil {
   val url = "jdbc:mysql://localhost:3306/spark?serverTimezone=Asia/Shanghai"
   val prop = new java.util.Properties
-  prop.setProperty("user", "root")
-  prop.setProperty("password", "WWESVR2012")
+  prop.setProperty("user", "ray")
+  prop.setProperty("password", "123456")
   prop.setProperty("driver", "com.mysql.cj.jdbc.Driver")
 
   def writeDevice(dataFrame: DataFrame): Unit = {

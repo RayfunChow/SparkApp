@@ -1,18 +1,16 @@
 package com.ray
 
-import java.sql.DriverManager
-
-import org.apache.spark.sql.{DataFrame, SparkSession}
-import org.apache.spark.sql.types._
+import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types._
 
 object App {
 
   val spark: SparkSession = SparkSession
     .builder()
-    .master("local")
+    .master("local[4]")
     .appName("App")
-    .enableHiveSupport()
+//    .enableHiveSupport()
     .getOrCreate()
 
   def main(args: Array[String]): Unit = {
@@ -22,7 +20,7 @@ object App {
 
     //读取csv文件
     val data = spark.read.format("csv").option("header", "true")
-      .load("C:\\Users\\a6481\\Documents\\Courseware\\GraduationDesign\\data\\data6.csv")
+      .load(args(0))
     //更改列名(df包含所有列)
     val df = data.withColumnRenamed(data.columns(0), "pid")
       .withColumnRenamed("Q1_1_TEXT", "browserName")
@@ -267,6 +265,8 @@ object App {
 
     MySQLUtil.writeTable(v_analysis_lohi, "v_analysis_lohi")
     MySQLUtil.writeTable(v_fovas_adpm, "v_fovas_adpm")
+
+    println("全部结束")
 
   }
 
