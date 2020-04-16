@@ -1,12 +1,13 @@
 package com.ray
 
+import org.apache.spark.sql.functions.max
 import org.apache.spark.sql.{DataFrame, SaveMode}
 
 object MySQLUtil {
   val url = "jdbc:mysql://localhost:3306/spark?serverTimezone=Asia/Shanghai"
   val prop = new java.util.Properties
-  prop.setProperty("user", "ray")
-  prop.setProperty("password", "123456")
+  prop.setProperty("user", "root")
+  prop.setProperty("password", "WWESVR2012")
   prop.setProperty("driver", "com.mysql.cj.jdbc.Driver")
 
   def writeDevice(dataFrame: DataFrame): Unit = {
@@ -48,6 +49,22 @@ object MySQLUtil {
     val dfw = dataFrame.write.mode(SaveMode.Overwrite)
     dfw.jdbc(url, tableName, prop)
     println("成功写入" + tableName + "表")
+  }
+
+  def writeConclusion(dataFrame: DataFrame, column: String): Unit = {
+    val tableName = "v_top_" + column.toLowerCase()
+    val df1 = dataFrame.groupBy("nationalityName", column + "Name")
+      .count().orderBy("nationalityName")
+    val df2 = df1.groupBy("nationalityName").agg(max("count"))
+      .withColumnRenamed("max(count)", "count")
+      .join(df1, Seq("nationalityName", "count"))
+    val df3 = dataFrame.groupBy("nationalityName").count()
+      .withColumnRenamed("count", "sum")
+    val df4 = df2.join(df3,Seq("nationalityName"))
+      .selectExpr("nationalityName", column + "Name", "count", "round(count/sum*100, 2)")
+    val df5 = df4.withColumnRenamed(df4.columns(3), "percent").orderBy("nationalityName")
+    df5.show(5)
+    writeTable(df5, tableName)
   }
 
 }
