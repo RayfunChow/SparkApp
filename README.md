@@ -10,7 +10,7 @@
     *   data1.filter("gender is not null").select("gender").limit(10).show  
     *   data1.filter("gender<>''").select("gender").limit(10).show
     *   df.where("BigFiveE == ' '").count() 
-*   写数据库时指定字段类型：  
+*   写数据库时指定字段类型(Spark 2.1.0不支持)：  
     df.write.option("createTableColumnTypes", "columnName VARCHAR(200)")      
 *   Spark SQL中列类型为String的在MySQL中对应为Text类型     
 *   Spark 2.1 不支持 createTableColumnTypes
@@ -32,3 +32,10 @@
     *   ps.executeBatch()
 *   删除表视图还存在，但是不能用了     
 *   删除重复值：dropDuplicates(colName)
+
+*   spark-submit命令：  
+`./spark-submit --class "com.ray.App" ~/IdeaProjects/SparkApp/out/artifacts/SparkApp_jar/SparkApp.jar /user/ray/input/data6.csv
+`
+*   hdfs路径(Ubuntu)：hdfs://localhost:9000/user/ray/input/data6.csv
+*   本地路径(Ubuntu)：file:///home/ray/文档/data6.csv
+*   本地路径(Windows)：C:\Users\a6481\Documents\Courseware\GraduationDesign\data\data6.csv

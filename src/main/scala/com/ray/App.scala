@@ -47,7 +47,7 @@ object App {
       .withColumnRenamed("Q23", "LOECode")
       .withColumnRenamed("Q27", "occupationCode")
       .withColumnRenamed("Q29", "LOHICode")
-//    df.show(10)
+    //    df.show(10)
 
     //device表
     var device = df.select(df.col("pid").cast(IntegerType), df.col("browserName"),
@@ -190,7 +190,7 @@ object App {
       .join(t_dim_age, Seq("ageCode"))
       .join(t_dim_loe, Seq("LOECode"))
       .join(t_dim_occupation, Seq("occupationCode"))
-      .select("pid", "genderCode", "genderName", "ageCode", "ageName", "LOECode", "LOEName", "occupationName", "TTFAName")
+      .select("pid", "genderCode", "genderName", "ageCode", "ageName", "LOECode", "LOEName", "occupationCode", "occupationName", "TTFACode", "TTFAName")
       .orderBy("pid")
 
     //v_analysis_toad
@@ -199,7 +199,7 @@ object App {
       .join(t_dim_age, Seq("ageCode"))
       .join(t_dim_loe, Seq("LOECode"))
       .join(t_dim_occupation, Seq("occupationCode"))
-      .select("pid", "genderCode", "genderName", "ageCode", "ageName", "LOECode", "LOEName", "occupationName", "TOADName")
+      .select("pid", "genderCode", "genderName", "ageCode", "ageName", "LOECode", "LOEName", "occupationCode", "occupationName", "TOADCode", "TOADName")
       .orderBy("pid")
 
     //v_analysis_cfda
@@ -208,7 +208,7 @@ object App {
       .join(t_dim_age, Seq("ageCode"))
       .join(t_dim_loe, Seq("LOECode"))
       .join(t_dim_occupation, Seq("occupationCode"))
-      .select("pid", "genderCode", "genderName", "ageCode", "ageName", "LOECode", "LOEName", "occupationName", "CFDAName")
+      .select("pid", "genderCode", "genderName", "ageCode", "ageName", "LOECode", "LOEName", "occupationCode", "occupationName", "CFDACode", "CFDAName")
       .orderBy("pid")
 
     //v_analysis_rfda
@@ -217,7 +217,7 @@ object App {
       .join(t_dim_age, Seq("ageCode"))
       .join(t_dim_loe, Seq("LOECode"))
       .join(t_dim_occupation, Seq("occupationCode"))
-      .select("pid", "genderCode", "genderName", "ageCode", "ageName", "LOECode", "LOEName", "occupationName", "RFDAName")
+      .select("pid", "genderCode", "genderName", "ageCode", "ageName", "LOECode", "LOEName", "occupationCode", "occupationName", "RFDACode", "RFDAName")
       .orderBy("pid")
 
     //v_analysis_rfsu
@@ -226,7 +226,7 @@ object App {
       .join(t_dim_age, Seq("ageCode"))
       .join(t_dim_loe, Seq("LOECode"))
       .join(t_dim_occupation, Seq("occupationCode"))
-      .select("pid", "genderCode", "genderName", "ageCode", "ageName", "LOECode", "LOEName", "occupationName", "RFSUName")
+      .select("pid", "genderCode", "genderName", "ageCode", "ageName", "LOECode", "LOEName", "occupationCode", "occupationName", "RFSUCode", "RFSUName")
       .orderBy("pid")
 
     val t_dim_lohi = MySQLUtil.readTable("t_dim_lohi")
@@ -236,7 +236,7 @@ object App {
       .join(v_rfsm_nationality, Seq("pid"))
       .join(t_dim_lohi, Seq("LOHICode"))
       .orderBy("LOHICode")
-      .select("pid", "phoneBrand", "LOHICode", "LOHIName", "RFSMName")
+      .select("pid", "phoneBrand", "LOHICode", "LOHIName", "RFSMCode", "RFSMName")
 
 
     val v_fovas_adpm = behavior.join(t_dim_fovas, Seq("FOVASCode"))
@@ -246,50 +246,49 @@ object App {
 
 
     //处理完成后一并写入数据库
-    /*MySQLUtil.writeDevice(device)
+    MySQLUtil.writeDevice(device)
     MySQLUtil.writeBeahvior(behavior)
     MySQLUtil.writeDemographic(demographic)
     MySQLUtil.writePersonality(df_personality)
 
-    MySQLUtil.writeTable(v_fovas_nationality, "v_fovas_nationality")
-    MySQLUtil.writeTable(v_device_nationality, "v_device_nationality")
-    MySQLUtil.writeTable(v_cfda_nationality, "v_cfda_nationality")
-    MySQLUtil.writeTable(v_htfa_nationality, "v_htfa_nationality")
-    MySQLUtil.writeTable(v_rfda_nationality, "v_rfda_nationality")
-    MySQLUtil.writeTable(v_rfra_nationality, "v_rfra_nationality")
-    MySQLUtil.writeTable(v_rfsm_nationality, "v_rfsm_nationality")
-    MySQLUtil.writeTable(v_rfsu_nationality, "v_rfsu_nationality")
-    MySQLUtil.writeTable(v_toad_nationality, "v_toad_nationality")
-    MySQLUtil.writeTable(v_ttfa_nationality, "v_ttfa_nationality")
+    //    MySQLUtil.writeTable(v_fovas_nationality, "v_fovas_nationality")
+    //    MySQLUtil.writeTable(v_device_nationality, "v_device_nationality")
+    //    MySQLUtil.writeTable(v_cfda_nationality, "v_cfda_nationality")
+    //    MySQLUtil.writeTable(v_htfa_nationality, "v_htfa_nationality")
+    //    MySQLUtil.writeTable(v_rfda_nationality, "v_rfda_nationality")
+    //    MySQLUtil.writeTable(v_rfra_nationality, "v_rfra_nationality")
+    //    MySQLUtil.writeTable(v_rfsm_nationality, "v_rfsm_nationality")
+    //    MySQLUtil.writeTable(v_rfsu_nationality, "v_rfsu_nationality")
+    //    MySQLUtil.writeTable(v_toad_nationality, "v_toad_nationality")
+    //    MySQLUtil.writeTable(v_ttfa_nationality, "v_ttfa_nationality")
 
     MySQLUtil.writeTable(v_analysis_ttfa, "v_analysis_ttfa")
     MySQLUtil.writeTable(v_analysis_toad, "v_analysis_toad")
     MySQLUtil.writeTable(v_analysis_cfda, "v_analysis_cfda")
     MySQLUtil.writeTable(v_analysis_rfda, "v_analysis_rfda")
     MySQLUtil.writeTable(v_analysis_rfsu, "v_analysis_rfsu")
-
     MySQLUtil.writeTable(v_analysis_lohi, "v_analysis_lohi")
-    MySQLUtil.writeTable(v_fovas_adpm, "v_fovas_adpm")*/
+    MySQLUtil.writeTable(v_fovas_adpm, "v_fovas_adpm")
 
-    MySQLUtil.writeConclusion(v_fovas_nationality,"FOVAS")
-    MySQLUtil.writeConclusion(v_cfda_nationality,"CFDA")
-    MySQLUtil.writeConclusion(v_htfa_nationality,"HTFA")
-    MySQLUtil.writeConclusion(v_rfda_nationality,"RFDA")
-    MySQLUtil.writeConclusion(v_rfra_nationality,"RFRA")
-    MySQLUtil.writeConclusion(v_rfsm_nationality,"RFSM")
-    MySQLUtil.writeConclusion(v_rfsu_nationality,"RFSU")
-    MySQLUtil.writeConclusion(v_toad_nationality,"TOAD")
-    MySQLUtil.writeConclusion(v_ttfa_nationality,"TTFA")
+    //    MySQLUtil.writeConclusion(v_fovas_nationality,"FOVAS")
+    //    MySQLUtil.writeConclusion(v_cfda_nationality,"CFDA")
+    //    MySQLUtil.writeConclusion(v_htfa_nationality,"HTFA")
+    //    MySQLUtil.writeConclusion(v_rfda_nationality,"RFDA")
+    //    MySQLUtil.writeConclusion(v_rfra_nationality,"RFRA")
+    //    MySQLUtil.writeConclusion(v_rfsm_nationality,"RFSM")
+    //    MySQLUtil.writeConclusion(v_rfsu_nationality,"RFSU")
+    //    MySQLUtil.writeConclusion(v_toad_nationality,"TOAD")
+    //    MySQLUtil.writeConclusion(v_ttfa_nationality,"TTFA")
 
 
-//    val v_fovas_nationality = MySQLUtil.readTable("v_fovas_nationality")
+    //    val v_fovas_nationality = MySQLUtil.readTable("v_fovas_nationality")
 
     //等价于select nationalityName, FOVASName, count(*) y from v_fovas_nationality group by nationalityName, FOVASName order by nationalityName, y desc
-//    val df1 = v_fovas_nationality.groupBy("nationalityName", "FOVASName").count().orderBy("nationalityName")
-//    df1.show
-//    val df2 = df1.groupBy("nationalityName").agg(max("count")).withColumnRenamed("max(count)", "count")
-//    df2.show
-//    df2.join(df1, Seq("nationalityName", "count")).orderBy("nationalityName").show()
+    //    val df1 = v_fovas_nationality.groupBy("nationalityName", "FOVASName").count().orderBy("nationalityName")
+    //    df1.show
+    //    val df2 = df1.groupBy("nationalityName").agg(max("count")).withColumnRenamed("max(count)", "count")
+    //    df2.show
+    //    df2.join(df1, Seq("nationalityName", "count")).orderBy("nationalityName").show()
     //    v_fovas_nationality.groupBy("nationalityName","FOVASName")
     //    v_fovas_nationality.show()
     //    spark.sql("select nationalityName, first(FOVASName), max(y) from (select nationalityName, FOVASName, count(*) y from v_fovas_nationality " +
@@ -523,14 +522,14 @@ object App {
   //    //      .join(t_dim_occupation, Seq("occupationCode"))
   //
   //    //v_analysis_ttfa
-  //    //    val v_analysis_ttfa = v_analysis.select("pid", "genderName", "ageName", "LOEName", "occupationName", "TTFAName")
+  //    //    val v_analysis_ttfa = v_analysis.select("pid", "genderName", "ageName", "LOEName", "occupationCode", "occupationName", "TTFAName")
   //    //      .orderBy("pid")
   //    val v_analysis_ttfa = demographic.join(v_ttfa_nationality, Seq("pid"))
   //      .join(t_dim_gender, Seq("genderCode"))
   //      .join(t_dim_age, Seq("ageCode"))
   //      .join(t_dim_loe, Seq("LOECode"))
   //      .join(t_dim_occupation, Seq("occupationCode"))
-  //      .select("pid", "genderCode", "genderName", "ageCode", "ageName", "LOECode", "LOEName", "occupationName", "TTFAName")
+  //      .select("pid", "genderCode", "genderName", "ageCode", "ageName", "LOECode", "LOEName", "occupationCode", "occupationName", "TTFAName")
   //      .orderBy("pid")
   //
   //    //v_analysis_toad
@@ -539,7 +538,7 @@ object App {
   //      .join(t_dim_age, Seq("ageCode"))
   //      .join(t_dim_loe, Seq("LOECode"))
   //      .join(t_dim_occupation, Seq("occupationCode"))
-  //      .select("pid", "genderCode", "genderName", "ageCode", "ageName", "LOECode", "LOEName", "occupationName", "TOADName")
+  //      .select("pid", "genderCode", "genderName", "ageCode", "ageName", "LOECode", "LOEName", "occupationCode", "occupationName", "TOADName")
   //      .orderBy("pid")
   //
   //    //v_analysis_cfda
@@ -548,7 +547,7 @@ object App {
   //      .join(t_dim_age, Seq("ageCode"))
   //      .join(t_dim_loe, Seq("LOECode"))
   //      .join(t_dim_occupation, Seq("occupationCode"))
-  //      .select("pid", "genderCode", "genderName", "ageCode", "ageName", "LOECode", "LOEName", "occupationName", "CFDAName")
+  //      .select("pid", "genderCode", "genderName", "ageCode", "ageName", "LOECode", "LOEName", "occupationCode", "occupationName", "CFDAName")
   //      .orderBy("pid")
   //
   //    //v_analysis_rfda
@@ -557,7 +556,7 @@ object App {
   //      .join(t_dim_age, Seq("ageCode"))
   //      .join(t_dim_loe, Seq("LOECode"))
   //      .join(t_dim_occupation, Seq("occupationCode"))
-  //      .select("pid", "genderCode", "genderName", "ageCode", "ageName", "LOECode", "LOEName", "occupationName", "RFDAName")
+  //      .select("pid", "genderCode", "genderName", "ageCode", "ageName", "LOECode", "LOEName", "occupationCode", "occupationName", "RFDAName")
   //      .orderBy("pid")
   //
   //    //v_analysis_rfsu
@@ -566,7 +565,7 @@ object App {
   //      .join(t_dim_age, Seq("ageCode"))
   //      .join(t_dim_loe, Seq("LOECode"))
   //      .join(t_dim_occupation, Seq("occupationCode"))
-  //      .select("pid", "genderCode", "genderName", "ageCode", "ageName", "LOECode", "LOEName", "occupationName", "RFSUName")
+  //      .select("pid", "genderCode", "genderName", "ageCode", "ageName", "LOECode", "LOEName", "occupationCode", "occupationName", "RFSUName")
   //      .orderBy("pid")
   //
   //
