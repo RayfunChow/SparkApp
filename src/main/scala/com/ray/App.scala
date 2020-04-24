@@ -8,9 +8,8 @@ import org.apache.spark.sql.types._
 
 object App {
 
-  val spark: SparkSession = SparkSession
-    .builder()
-    .master("local[8]")
+  val spark: SparkSession = SparkSession.builder()
+    .master("local[16]")
     .appName("App")
     //    .enableHiveSupport()
     .getOrCreate()
@@ -24,8 +23,13 @@ object App {
 
 
     //读取csv文件
-    val data = spark.read.format("csv").option("header", "true")
-      .load(args(0))
+    val data = spark.read.format("csv")
+      .option("header", "true") //将第一行视为列名
+      .load(args(0)) //文件路径
+
+    println(data.schema)
+    data.show(5)
+
     //更改列名(df包含所有列)
     val df = data.withColumnRenamed(data.columns(0), "pid")
       .withColumnRenamed("Q1_1_TEXT", "browserName")
@@ -47,26 +51,37 @@ object App {
       .withColumnRenamed("Q23", "LOECode")
       .withColumnRenamed("Q27", "occupationCode")
       .withColumnRenamed("Q29", "LOHICode")
-    //    df.show(10)
+      .withColumn("pid", col("pid").cast(DataTypes.IntegerType))
+      .withColumn("FOVASCode", col("FOVASCode").cast(DataTypes.IntegerType))
+      .withColumn("ADPMCode", col("ADPMCode").cast(DataTypes.IntegerType))
+      .withColumn("genderCode", col("genderCode").cast(DataTypes.IntegerType))
+      .withColumn("ageCode", col("ageCode").cast(DataTypes.IntegerType))
+      .withColumn("nationalityCode", col("nationalityCode").cast(DataTypes.IntegerType))
+      .withColumn("LOECode", col("LOECode").cast(DataTypes.IntegerType))
+      .withColumn("occupationCode", col("occupationCode").cast(DataTypes.IntegerType))
+      .withColumn("LOHICode", col("LOHICode").cast(DataTypes.IntegerType))
+
+    println(df.schema)
 
     //device表
-    var device = df.select(df.col("pid").cast(IntegerType), df.col("browserName"),
+    var device = df.select(df.col("pid"),
+      df.col("browserName"),
       df.col("os"), df.col("phoneBrand"))
 
     //behavior表
-    var behavior = df.select(df.col("pid").cast(IntegerType), df.col("FOVASCode").cast(IntegerType),
+    var behavior = df.select(df.col("pid"), df.col("FOVASCode"),
       df.col("TOADCode"), df.col("ADPMCode").cast(IntegerType), df.col("TTFACode"),
       df.col("HTFACode"), df.col("CFDACode"), df.col("RFDACode"), df.col("RFSMCode"),
       df.col("RFRACode"), df.col("RFSUCode"))
 
     //demographic表
-    var demographic = df.select(df.col("pid").cast(IntegerType), df.col("genderCode").cast(IntegerType),
-      df.col("ageCode").cast(IntegerType), df.col("nationalityCode").cast(IntegerType),
-      df.col("LOECode").cast(IntegerType), df.col("occupationCode").cast(IntegerType),
-      df.col("LOHICode").cast(IntegerType))
+    var demographic = df.select(df.col("pid"), df.col("genderCode"),
+      df.col("ageCode"), df.col("nationalityCode"),
+      df.col("LOECode"), df.col("occupationCode"),
+      df.col("LOHICode"))
 
     //personality表
-    var df_personality = df.select(df.col("pid").cast(IntegerType), df.col("BigFiveE").cast(IntegerType),
+    var personality = df.select(df.col("pid"), df.col("BigFiveE").cast(IntegerType),
       df.col("BigFiveN").cast(IntegerType), df.col("BigFiveA").cast(IntegerType),
       df.col("BigFiveO").cast(IntegerType), df.col("BigFiveC").cast(IntegerType))
 
@@ -74,14 +89,14 @@ object App {
     device = device.filter("phoneBrand <> ' '")
     behavior = behavior.filter("FOVASCode is not null")
     demographic = demographic.filter("genderCode is not null")
-    df_personality = df_personality.filter("BigFiveE is not null")
+    personality = personality.filter("BigFiveE is not null")
 
     //读取整体数据(v_overall中只有需要的列)
-    val v_overall = device.join(behavior, Seq("pid")).join(demographic, Seq("pid"))
+    //    val df = device.join(behavior, Seq("pid")).join(demographic, Seq("pid"))
     val t_dim_nationality = MySQLUtil.readTable("t_dim_nationality")
 
     //v_device_nationality
-    val v_device_nationality = v_overall.join(t_dim_nationality, Seq("nationalityCode")).
+    val v_device_nationality = df.join(t_dim_nationality, Seq("nationalityCode")).
       select("pid", "browserName", "phoneBrand", "nationalityName").orderBy("pid")
 
     //读取behavior相关维表
@@ -97,17 +112,17 @@ object App {
 
     //创建视图
     //v_fovas_nationality
-    val v_overall_fovas = v_overall.join(t_dim_nationality, Seq("nationalityCode"))
-      .withColumn("FOVASCode", explode(split(v_overall.col("FOVASCode"), "[,]")))
+    val v_overall_fovas = df.join(t_dim_nationality, Seq("nationalityCode"))
+      .withColumn("FOVASCode", explode(split(df.col("FOVASCode"), "[,]")))
       .join(t_dim_fovas, Seq("FOVASCode"))
     val v_fovas_nationality = v_overall_fovas
-      .select(v_overall_fovas.col("pid"), v_overall_fovas.col("FOVASCode").cast(IntegerType),
+      .select(v_overall_fovas.col("pid"), v_overall_fovas.col("FOVASCode"),
         v_overall_fovas.col("FOVASName"), v_overall_fovas.col("nationalityName"))
       .orderBy("pid", "FOVASCode")
 
     //v_cfda_nationality
-    val v_overall_cfda = v_overall.join(t_dim_nationality, Seq("nationalityCode"))
-      .withColumn("CFDACode", explode(split(v_overall.col("CFDACode"), "[,]")))
+    val v_overall_cfda = df.join(t_dim_nationality, Seq("nationalityCode"))
+      .withColumn("CFDACode", explode(split(df.col("CFDACode"), "[,]")))
       .join(t_dim_cfda, Seq("CFDACode"))
     val v_cfda_nationality = v_overall_cfda
       .select(v_overall_cfda.col("pid"), v_overall_cfda.col("CFDACode").cast(IntegerType),
@@ -115,8 +130,8 @@ object App {
       .orderBy("pid", "CFDACode")
 
     //v_htfa_nationality
-    val v_overall_htfa = v_overall.join(t_dim_nationality, Seq("nationalityCode"))
-      .withColumn("HTFACode", explode(split(v_overall.col("HTFACode"), "[,]")))
+    val v_overall_htfa = df.join(t_dim_nationality, Seq("nationalityCode"))
+      .withColumn("HTFACode", explode(split(df.col("HTFACode"), "[,]")))
       .join(t_dim_htfa, Seq("HTFACode"))
     val v_htfa_nationality = v_overall_htfa
       .select(v_overall_htfa.col("pid"), v_overall_htfa.col("HTFACode").cast(IntegerType),
@@ -124,8 +139,8 @@ object App {
       .orderBy("pid", "HTFACode")
 
     //v_rfda_nationality
-    val v_overall_rfda = v_overall.join(t_dim_nationality, Seq("nationalityCode"))
-      .withColumn("RFDACode", explode(split(v_overall.col("RFDACode"), "[,]")))
+    val v_overall_rfda = df.join(t_dim_nationality, Seq("nationalityCode"))
+      .withColumn("RFDACode", explode(split(df.col("RFDACode"), "[,]")))
       .join(t_dim_rfda, Seq("RFDACode"))
     val v_rfda_nationality = v_overall_rfda
       .select(v_overall_rfda.col("pid"), v_overall_rfda.col("RFDACode").cast(IntegerType),
@@ -133,8 +148,8 @@ object App {
       .orderBy("pid", "RFDACode")
 
     //v_rfra_nationality
-    val v_overall_rfra = v_overall.join(t_dim_nationality, Seq("nationalityCode"))
-      .withColumn("RFRACode", explode(split(v_overall.col("RFRACode"), "[,]")))
+    val v_overall_rfra = df.join(t_dim_nationality, Seq("nationalityCode"))
+      .withColumn("RFRACode", explode(split(df.col("RFRACode"), "[,]")))
       .join(t_dim_rfra, Seq("RFRACode"))
     val v_rfra_nationality = v_overall_rfra
       .select(v_overall_rfra.col("pid"), v_overall_rfra.col("RFRACode").cast(IntegerType),
@@ -142,8 +157,8 @@ object App {
       .orderBy("pid", "RFRACode")
 
     //v_rfsm_nationality
-    val v_overall_rfsm = v_overall.join(t_dim_nationality, Seq("nationalityCode"))
-      .withColumn("RFSMCode", explode(split(v_overall.col("RFSMCode"), "[,]")))
+    val v_overall_rfsm = df.join(t_dim_nationality, Seq("nationalityCode"))
+      .withColumn("RFSMCode", explode(split(df.col("RFSMCode"), "[,]")))
       .join(t_dim_rfsm, Seq("RFSMCode"))
     val v_rfsm_nationality = v_overall_rfsm
       .select(v_overall_rfsm.col("pid"), v_overall_rfsm.col("RFSMCode").cast(IntegerType),
@@ -151,8 +166,8 @@ object App {
       .orderBy("pid", "RFSMCode")
 
     //v_rfsu_nationality
-    val v_overall_rfsu = v_overall.join(t_dim_nationality, Seq("nationalityCode"))
-      .withColumn("RFSUCode", explode(split(v_overall.col("RFSUCode"), "[,]")))
+    val v_overall_rfsu = df.join(t_dim_nationality, Seq("nationalityCode"))
+      .withColumn("RFSUCode", explode(split(df.col("RFSUCode"), "[,]")))
       .join(t_dim_rfsu, Seq("RFSUCode"))
     val v_rfsu_nationality = v_overall_rfsu
       .select(v_overall_rfsu.col("pid"), v_overall_rfsu.col("RFSUCode").cast(IntegerType),
@@ -160,8 +175,8 @@ object App {
       .orderBy("pid", "RFSUCode")
 
     //v_toad_nationality
-    val v_overall_toad = v_overall.join(t_dim_nationality, Seq("nationalityCode"))
-      .withColumn("TOADCode", explode(split(v_overall.col("TOADCode"), "[,]")))
+    val v_overall_toad = df.join(t_dim_nationality, Seq("nationalityCode"))
+      .withColumn("TOADCode", explode(split(df.col("TOADCode"), "[,]")))
       .join(t_dim_toad, Seq("TOADCode"))
     val v_toad_nationality = v_overall_toad
       .select(v_overall_toad.col("pid"), v_overall_toad.col("TOADCode").cast(IntegerType),
@@ -169,8 +184,8 @@ object App {
       .orderBy("pid", "TOADCode")
 
     //v_ttfa_nationality
-    val v_overall_ttfa = v_overall.join(t_dim_nationality, Seq("nationalityCode"))
-      .withColumn("TTFACode", explode(split(v_overall.col("TTFACode"), "[,]")))
+    val v_overall_ttfa = df.join(t_dim_nationality, Seq("nationalityCode"))
+      .withColumn("TTFACode", explode(split(df.col("TTFACode"), "[,]")))
       .join(t_dim_ttfa, Seq("TTFACode"))
     val v_ttfa_nationality = v_overall_ttfa
       .select(v_overall_ttfa.col("pid"), v_overall_ttfa.col("TTFACode").cast(IntegerType),
@@ -208,7 +223,8 @@ object App {
       .join(t_dim_age, Seq("ageCode"))
       .join(t_dim_loe, Seq("LOECode"))
       .join(t_dim_occupation, Seq("occupationCode"))
-      .select("pid", "genderCode", "genderName", "ageCode", "ageName", "LOECode", "LOEName", "occupationCode", "occupationName", "CFDACode", "CFDAName")
+      .select("pid", "genderCode", "genderName", "ageCode", "ageName",
+        "LOECode", "LOEName", "occupationCode", "occupationName", "CFDACode", "CFDAName")
       .orderBy("pid")
 
     //v_analysis_rfda
@@ -226,7 +242,8 @@ object App {
       .join(t_dim_age, Seq("ageCode"))
       .join(t_dim_loe, Seq("LOECode"))
       .join(t_dim_occupation, Seq("occupationCode"))
-      .select("pid", "genderCode", "genderName", "ageCode", "ageName", "LOECode", "LOEName", "occupationCode", "occupationName", "RFSUCode", "RFSUName")
+      .select("pid", "genderCode", "genderName", "ageCode", "ageName", "LOECode",
+        "LOEName", "occupationCode", "occupationName", "RFSUCode", "RFSUName")
       .orderBy("pid")
 
     val t_dim_lohi = MySQLUtil.readTable("t_dim_lohi")
@@ -246,39 +263,40 @@ object App {
 
 
     //处理完成后一并写入数据库
-    MySQLUtil.writeDevice(device)
-    MySQLUtil.writeBeahvior(behavior)
-    MySQLUtil.writeDemographic(demographic)
-    MySQLUtil.writePersonality(df_personality)
+//    MySQLUtil.writeDevice(device)
+//    MySQLUtil.writeBeahvior(behavior)
+//    MySQLUtil.writeTable(demographic, "demographic")
+//    MySQLUtil.writeTable(personality, "personality")
+//    MySQLUtil.writeDemographic(demographic)
+//    MySQLUtil.writePersonality(personality)
+    //        MySQLUtil.writeTable(v_fovas_nationality, "v_fovas_nationality")
+    //        MySQLUtil.writeTable(v_device_nationality, "v_device_nationality")
+    //        MySQLUtil.writeTable(v_cfda_nationality, "v_cfda_nationality")
+    //        MySQLUtil.writeTable(v_htfa_nationality, "v_htfa_nationality")
+    //        MySQLUtil.writeTable(v_rfda_nationality, "v_rfda_nationality")
+    //        MySQLUtil.writeTable(v_rfra_nationality, "v_rfra_nationality")
+    //        MySQLUtil.writeTable(v_rfsm_nationality, "v_rfsm_nationality")
+    //        MySQLUtil.writeTable(v_rfsu_nationality, "v_rfsu_nationality")
+    //        MySQLUtil.writeTable(v_toad_nationality, "v_toad_nationality")
+    //        MySQLUtil.writeTable(v_ttfa_nationality, "v_ttfa_nationality")
 
-    //    MySQLUtil.writeTable(v_fovas_nationality, "v_fovas_nationality")
-    //    MySQLUtil.writeTable(v_device_nationality, "v_device_nationality")
-    //    MySQLUtil.writeTable(v_cfda_nationality, "v_cfda_nationality")
-    //    MySQLUtil.writeTable(v_htfa_nationality, "v_htfa_nationality")
-    //    MySQLUtil.writeTable(v_rfda_nationality, "v_rfda_nationality")
-    //    MySQLUtil.writeTable(v_rfra_nationality, "v_rfra_nationality")
-    //    MySQLUtil.writeTable(v_rfsm_nationality, "v_rfsm_nationality")
-    //    MySQLUtil.writeTable(v_rfsu_nationality, "v_rfsu_nationality")
-    //    MySQLUtil.writeTable(v_toad_nationality, "v_toad_nationality")
-    //    MySQLUtil.writeTable(v_ttfa_nationality, "v_ttfa_nationality")
+//    MySQLUtil.writeTable(v_analysis_ttfa, "v_analysis_ttfa")
+//    MySQLUtil.writeTable(v_analysis_toad, "v_analysis_toad")
+//    MySQLUtil.writeTable(v_analysis_cfda, "v_analysis_cfda")
+//    MySQLUtil.writeTable(v_analysis_rfda, "v_analysis_rfda")
+//    MySQLUtil.writeTable(v_analysis_rfsu, "v_analysis_rfsu")
+//    MySQLUtil.writeTable(v_analysis_lohi, "v_analysis_lohi")
+//    MySQLUtil.writeTable(v_fovas_adpm, "v_fovas_adpm")
 
-    MySQLUtil.writeTable(v_analysis_ttfa, "v_analysis_ttfa")
-    MySQLUtil.writeTable(v_analysis_toad, "v_analysis_toad")
-    MySQLUtil.writeTable(v_analysis_cfda, "v_analysis_cfda")
-    MySQLUtil.writeTable(v_analysis_rfda, "v_analysis_rfda")
-    MySQLUtil.writeTable(v_analysis_rfsu, "v_analysis_rfsu")
-    MySQLUtil.writeTable(v_analysis_lohi, "v_analysis_lohi")
-    MySQLUtil.writeTable(v_fovas_adpm, "v_fovas_adpm")
-
-    //    MySQLUtil.writeConclusion(v_fovas_nationality,"FOVAS")
-    //    MySQLUtil.writeConclusion(v_cfda_nationality,"CFDA")
-    //    MySQLUtil.writeConclusion(v_htfa_nationality,"HTFA")
-    //    MySQLUtil.writeConclusion(v_rfda_nationality,"RFDA")
-    //    MySQLUtil.writeConclusion(v_rfra_nationality,"RFRA")
-    //    MySQLUtil.writeConclusion(v_rfsm_nationality,"RFSM")
-    //    MySQLUtil.writeConclusion(v_rfsu_nationality,"RFSU")
-    //    MySQLUtil.writeConclusion(v_toad_nationality,"TOAD")
-    //    MySQLUtil.writeConclusion(v_ttfa_nationality,"TTFA")
+    //    MySQLUtil.writeTop(v_fovas_nationality,"FOVAS")
+    //    MySQLUtil.writeTop(v_cfda_nationality,"CFDA")
+        MySQLUtil.writeTop(v_htfa_nationality,"HTFA")
+    //    MySQLUtil.writeTop(v_rfda_nationality,"RFDA")
+    //    MySQLUtil.writeTop(v_rfra_nationality,"RFRA")
+    //    MySQLUtil.writeTop(v_rfsm_nationality,"RFSM")
+    //    MySQLUtil.writeTop(v_rfsu_nationality,"RFSU")
+    //    MySQLUtil.writeTop(v_toad_nationality,"TOAD")
+    //    MySQLUtil.writeTop(v_ttfa_nationality,"TTFA")
 
 
     //    val v_fovas_nationality = MySQLUtil.readTable("v_fovas_nationality")
@@ -332,23 +350,23 @@ object App {
   //    df.show(10)
   //
   //    //device表
-  //    var device = df.select(df.col("pid").cast(IntegerType), df.col("browserName"),
+  //    var device = df.select(df.col("pid"), df.col("browserName"),
   //      df.col("os"), df.col("phoneBrand"))
   //
   //    //behavior表
-  //    var behavior = df.select(df.col("pid").cast(IntegerType), df.col("FOVASCode").cast(IntegerType),
+  //    var behavior = df.select(df.col("pid"), df.col("FOVASCode"),
   //      df.col("TOADCode"), df.col("ADPMCode").cast(IntegerType), df.col("TTFACode"),
   //      df.col("HTFACode"), df.col("CFDACode"), df.col("RFDACode"), df.col("RFSMCode"),
   //      df.col("RFRACode"), df.col("RFSUCode"))
   //
   //    //demographic表
-  //    var demographic = df.select(df.col("pid").cast(IntegerType), df.col("genderCode").cast(IntegerType),
+  //    var demographic = df.select(df.col("pid"), df.col("genderCode"),
   //      df.col("ageCode").cast(IntegerType), df.col("nationalityCode").cast(IntegerType),
   //      df.col("LOECode").cast(IntegerType), df.col("occupationCode").cast(IntegerType),
   //      df.col("LOHICode").cast(IntegerType))
   //
   //    //personality表
-  //    var df_personality = df.select(df.col("pid").cast(IntegerType), df.col("BigFiveE").cast(IntegerType),
+  //    var personality = df.select(df.col("pid"), df.col("BigFiveE").cast(IntegerType),
   //      df.col("BigFiveN").cast(IntegerType), df.col("BigFiveA").cast(IntegerType),
   //      df.col("BigFiveO").cast(IntegerType), df.col("BigFiveC").cast(IntegerType))
   //
@@ -356,13 +374,13 @@ object App {
   //    device = device.filter("phoneBrand <> ' '")
   //    behavior = behavior.filter("FOVASCode is not null")
   //    demographic = demographic.filter("genderCode is not null")
-  //    df_personality = df_personality.filter("BigFiveE is not null")
+  //    personality = personality.filter("BigFiveE is not null")
   //
   //    //    device.selectExpr("*","if(browserName=' ','Other',browserName)")
   //    MySQLUtil.writeDevice(device)
   //    MySQLUtil.writeBeahvior(behavior)
   //    MySQLUtil.writeDemographic(demographic)
-  //    MySQLUtil.writePersonality(df_personality)
+  //    MySQLUtil.writePersonality(personality)
   //  }
 
   /**
@@ -379,11 +397,11 @@ object App {
   ////    demographic.createOrReplaceTempView("demographic")
   //
   //    //读取整体数据
-  //    val v_overall = device.join(behavior, Seq("pid")).join(demographic, Seq("pid"))
+  //    val df = device.join(behavior, Seq("pid")).join(demographic, Seq("pid"))
   //    val t_dim_nationality = MySQLUtil.readTable("t_dim_nationality")
   //
   //    //v_device_nationality
-  //    val v_device_nationality = v_overall.join(t_dim_nationality, Seq("nationalityCode")).
+  //    val v_device_nationality = df.join(t_dim_nationality, Seq("nationalityCode")).
   //      select("pid", "browserName", "phoneBrand", "nationalityName").orderBy("pid")
   //
   //    //读取behavior相关维表
@@ -399,17 +417,17 @@ object App {
   //
   //
   //    //v_fovas_nationality
-  //    val v_overall_fovas = v_overall.join(t_dim_nationality, Seq("nationalityCode"))
-  //      .withColumn("FOVASCode", explode(split(v_overall.col("FOVASCode"), "[,]")))
+  //    val v_overall_fovas = df.join(t_dim_nationality, Seq("nationalityCode"))
+  //      .withColumn("FOVASCode", explode(split(df.col("FOVASCode"), "[,]")))
   //      .join(t_dim_fovas, Seq("FOVASCode"))
   //    val v_fovas_nationality = v_overall_fovas
-  //      .select(v_overall_fovas.col("pid"), v_overall_fovas.col("FOVASCode").cast(IntegerType),
+  //      .select(v_overall_fovas.col("pid"), v_overall_fovas.col("FOVASCode"),
   //        v_overall_fovas.col("FOVASName"), v_overall_fovas.col("nationalityName"))
   //      .orderBy("pid", "FOVASCode")
   //
   //    //v_cfda_nationality
-  //    val v_overall_cfda = v_overall.join(t_dim_nationality, Seq("nationalityCode"))
-  //      .withColumn("CFDACode", explode(split(v_overall.col("CFDACode"), "[,]")))
+  //    val v_overall_cfda = df.join(t_dim_nationality, Seq("nationalityCode"))
+  //      .withColumn("CFDACode", explode(split(df.col("CFDACode"), "[,]")))
   //      .join(t_dim_cfda, Seq("CFDACode"))
   //    val v_cfda_nationality = v_overall_cfda
   //      .select(v_overall_cfda.col("pid"), v_overall_cfda.col("CFDACode").cast(IntegerType),
@@ -417,8 +435,8 @@ object App {
   //      .orderBy("pid", "CFDACode")
   //
   //    //v_htfa_nationality
-  //    val v_overall_htfa = v_overall.join(t_dim_nationality, Seq("nationalityCode"))
-  //      .withColumn("HTFACode", explode(split(v_overall.col("HTFACode"), "[,]")))
+  //    val v_overall_htfa = df.join(t_dim_nationality, Seq("nationalityCode"))
+  //      .withColumn("HTFACode", explode(split(df.col("HTFACode"), "[,]")))
   //      .join(t_dim_htfa, Seq("HTFACode"))
   //    val v_htfa_nationality = v_overall_htfa
   //      .select(v_overall_htfa.col("pid"), v_overall_htfa.col("HTFACode").cast(IntegerType),
@@ -426,8 +444,8 @@ object App {
   //      .orderBy("pid", "HTFACode")
   //
   //    //v_rfda_nationality
-  //    val v_overall_rfda = v_overall.join(t_dim_nationality, Seq("nationalityCode"))
-  //      .withColumn("RFDACode", explode(split(v_overall.col("RFDACode"), "[,]")))
+  //    val v_overall_rfda = df.join(t_dim_nationality, Seq("nationalityCode"))
+  //      .withColumn("RFDACode", explode(split(df.col("RFDACode"), "[,]")))
   //      .join(t_dim_rfda, Seq("RFDACode"))
   //    val v_rfda_nationality = v_overall_rfda
   //      .select(v_overall_rfda.col("pid"), v_overall_rfda.col("RFDACode").cast(IntegerType),
@@ -435,8 +453,8 @@ object App {
   //      .orderBy("pid", "RFDACode")
   //
   //    //v_rfra_nationality
-  //    val v_overall_rfra = v_overall.join(t_dim_nationality, Seq("nationalityCode"))
-  //      .withColumn("RFRACode", explode(split(v_overall.col("RFRACode"), "[,]")))
+  //    val v_overall_rfra = df.join(t_dim_nationality, Seq("nationalityCode"))
+  //      .withColumn("RFRACode", explode(split(df.col("RFRACode"), "[,]")))
   //      .join(t_dim_rfra, Seq("RFRACode"))
   //    val v_rfra_nationality = v_overall_rfra
   //      .select(v_overall_rfra.col("pid"), v_overall_rfra.col("RFRACode").cast(IntegerType),
@@ -444,8 +462,8 @@ object App {
   //      .orderBy("pid", "RFRACode")
   //
   //    //v_rfsm_nationality
-  //    val v_overall_rfsm = v_overall.join(t_dim_nationality, Seq("nationalityCode"))
-  //      .withColumn("RFSMCode", explode(split(v_overall.col("RFSMCode"), "[,]")))
+  //    val v_overall_rfsm = df.join(t_dim_nationality, Seq("nationalityCode"))
+  //      .withColumn("RFSMCode", explode(split(df.col("RFSMCode"), "[,]")))
   //      .join(t_dim_rfsm, Seq("RFSMCode"))
   //    val v_rfsm_nationality = v_overall_rfsm
   //      .select(v_overall_rfsm.col("pid"), v_overall_rfsm.col("RFSMCode").cast(IntegerType),
@@ -453,8 +471,8 @@ object App {
   //      .orderBy("pid", "RFSMCode")
   //
   //    //v_rfsu_nationality
-  //    val v_overall_rfsu = v_overall.join(t_dim_nationality, Seq("nationalityCode"))
-  //      .withColumn("RFSUCode", explode(split(v_overall.col("RFSUCode"), "[,]")))
+  //    val v_overall_rfsu = df.join(t_dim_nationality, Seq("nationalityCode"))
+  //      .withColumn("RFSUCode", explode(split(df.col("RFSUCode"), "[,]")))
   //      .join(t_dim_rfsu, Seq("RFSUCode"))
   //    val v_rfsu_nationality = v_overall_rfsu
   //      .select(v_overall_rfsu.col("pid"), v_overall_rfsu.col("RFSUCode").cast(IntegerType),
@@ -462,8 +480,8 @@ object App {
   //      .orderBy("pid", "RFSUCode")
   //
   //    //v_toad_nationality
-  //    val v_overall_toad = v_overall.join(t_dim_nationality, Seq("nationalityCode"))
-  //      .withColumn("TOADCode", explode(split(v_overall.col("TOADCode"), "[,]")))
+  //    val v_overall_toad = df.join(t_dim_nationality, Seq("nationalityCode"))
+  //      .withColumn("TOADCode", explode(split(df.col("TOADCode"), "[,]")))
   //      .join(t_dim_toad, Seq("TOADCode"))
   //    val v_toad_nationality = v_overall_toad
   //      .select(v_overall_toad.col("pid"), v_overall_toad.col("TOADCode").cast(IntegerType),
@@ -471,15 +489,15 @@ object App {
   //      .orderBy("pid", "TOADCode")
   //
   //    //v_ttfa_nationality
-  //    val v_overall_ttfa = v_overall.join(t_dim_nationality, Seq("nationalityCode"))
-  //      .withColumn("TTFACode", explode(split(v_overall.col("TTFACode"), "[,]")))
+  //    val v_overall_ttfa = df.join(t_dim_nationality, Seq("nationalityCode"))
+  //      .withColumn("TTFACode", explode(split(df.col("TTFACode"), "[,]")))
   //      .join(t_dim_ttfa, Seq("TTFACode"))
   //    val v_ttfa_nationality = v_overall_ttfa
   //      .select(v_overall_ttfa.col("pid"), v_overall_ttfa.col("TTFACode").cast(IntegerType),
   //        v_overall_ttfa.col("TTFAName"), v_overall_ttfa.col("nationalityName"))
   //      .orderBy("pid", "TTFACode")
   //
-  //    //    MySQLUtil.writeTable(v_overall, "v_overall")
+  //    //    MySQLUtil.writeTable(df, "df")
   //    MySQLUtil.writeTable(v_fovas_nationality, "v_fovas_nationality")
   //    MySQLUtil.writeTable(v_device_nationality, "v_device_nationality")
   //    MySQLUtil.writeTable(v_cfda_nationality, "v_cfda_nationality")
